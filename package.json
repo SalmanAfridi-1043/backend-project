@@ -1,0 +1,28 @@
+{
+  "name": "backend-project",
+  "version": "1.0.0",
+  "description": "This is a coplete  backend focus project",
+  "keywords": [
+    "javascript",
+    "backend"
+  ],
+  "homepage": "https://github.com/SalmanAfridi-1043/backend-project#readme",
+  "bugs": {
+    "url": "https://github.com/SalmanAfridi-1043/backend-project/issues"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/SalmanAfridi-1043/backend-project.git"
+  },
+  "license": "ISC",
+  "author": "Salman Afridi",
+  "type": "module",
+  "main": "index.js",
+  "scripts": {
+    "dev": "nodemon src/index.js"
+  },
+  "devDependencies": {
+    "nodemon": "^3.1.14",
+    "prettier": "^3.9.5"
+  }
+}
