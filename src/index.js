@@ -3,6 +3,8 @@ import connectDB from "./db/index.js";
 import { log } from "console";
 import express from "express";
 import { errorMonitor } from "events";
+import { uploadOnCloudinary } from "./utils/Cloudinary.js";
+
 
 dotenv.config();
 
@@ -23,3 +25,4 @@ connectDB()
   .catch((error) => {
     console.log("MongoBD connection failed : ", error);
   });
+
