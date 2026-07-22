@@ -4,11 +4,9 @@ import { log } from "console";
 import express from "express";
 import { errorMonitor } from "events";
 import { uploadOnCloudinary } from "./utils/Cloudinary.js";
-
+import { app } from "./app.js";
 
 dotenv.config();
-
-const app = express();
 
 const port = process.env.PORT || 3000;
 
@@ -25,4 +23,3 @@ connectDB()
   .catch((error) => {
     console.log("MongoBD connection failed : ", error);
   });
-
