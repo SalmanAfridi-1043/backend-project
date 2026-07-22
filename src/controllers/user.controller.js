@@ -1,12 +1,14 @@
 import { asyncHandler } from "../utils/asyncHandler.js";
 import { ApiError } from "../utils/ApiError.js";
-import { User } from "../models/user.model.jsS";
-import { uploadOnCloudinary } from "../utils/Cloudinary.js ";
+import { User } from "../models/user.model.js";
+import { uploadOnCloudinary } from "../utils/Cloudinary.js";
 import { ApiResponse } from "../utils/ApiResponse.js";
 
 const registerUser = asyncHandler(async (req, res) => {
   const { fullname, username, email, password } = req.body;
+
   // console.log("fullname ", name);
+  // console.log("Request body : ", req.body);
 
   if (
     [fullname, username, email, password].some((field) => field?.trim() === "")
@@ -14,7 +16,7 @@ const registerUser = asyncHandler(async (req, res) => {
     throw new ApiError(400, "All fields are required");
   }
 
-  const userExist = User.findOne({
+  const userExist = await User.findOne({
     $or: [{ username, email }],
   });
 
@@ -25,7 +27,18 @@ const registerUser = asyncHandler(async (req, res) => {
   // below is return from multer when it saves the images on cloudinary
   // req.body is from express while req.files is from multer
   const avatarPath = req.files?.avatar[0]?.path;
-  const coverImagePath = req.files?.coverImage[0]?.path;
+  // const coverImagePath = req.files?.coverImage[0]?.path;
+
+  let coverImagePath;
+  if (
+    req.files &&
+    Array.isArray(req.files.coverImage) &&
+    req.files.coverImage.length > 0
+  ) {
+    coverImagePath = req.files.coverImage[0].path;
+  }
+
+  // console.log("Request file : ", req.files);
 
   if (!avatarPath) {
     throw new ApiError(400, "Avatar is required");
