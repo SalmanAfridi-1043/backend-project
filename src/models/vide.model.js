@@ -1,7 +1,7 @@
 import mongoose, { Schema, model, setDriver } from "mongoose";
 import mongooseAggregatePaginate from "mongoose-aggregate-paginate-v2";
 
-const videoSchema = Schema(
+const videoSchema = new Schema(
   {
     videoFile: {
       type: String, // cloudinar
