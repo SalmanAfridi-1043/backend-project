@@ -167,7 +167,7 @@ const loggOutUser = asyncHandler(async (req, res) => {
   await User.findByIdAndUpdate(
     req.user._id,
     {
-      $set: { refreshToken: undefined },
+      $unset: { refreshToken: 1 },
     },
     {
       new: true,
@@ -451,7 +451,9 @@ const getUserChannelProfile = asyncHandler(async (req, res) => {
 });
 
 const getWatchHistory = asyncHandler(async (req, res) => {
-  const user = User.aggregate([
+  // console.log("User :", req.user._id);
+
+  const user = await User.aggregate([
     {
       $match: {
         _id: new mongoose.Types.ObjectId(req.user?._id),
@@ -473,13 +475,15 @@ const getWatchHistory = asyncHandler(async (req, res) => {
               foreignField: "_id",
               as: "owner",
 
-              pipeline: {
-                $project: {
-                  fullname: 1,
-                  username: 1,
-                  avatar: 1,
+              pipeline: [
+                {
+                  $project: {
+                    fullname: 1,
+                    username: 1,
+                    avatar: 1,
+                  },
                 },
-              },
+              ],
             },
           },
           {
@@ -493,6 +497,10 @@ const getWatchHistory = asyncHandler(async (req, res) => {
       },
     },
   ]);
+
+  if (!user?.length) {
+    throw new ApiError(400, "User does not exist");
+  }
 
   return res
     .status(200)
