@@ -1,7 +1,10 @@
 import { asyncHandler } from "../utils/asyncHandler.js";
 import { ApiError } from "../utils/ApiError.js";
 import { User } from "../models/user.model.js";
-import { uploadOnCloudinary } from "../utils/Cloudinary.js";
+import {
+  uploadOnCloudinary,
+  deleteFromCloudinary,
+} from "../utils/Cloudinary.js";
 import { ApiResponse } from "../utils/ApiResponse.js";
 import jwt from "jsonwebtoken";
 import mongoose from "mongoose";
@@ -291,6 +294,10 @@ const updateUserAvatar = asyncHandler(async (req, res) => {
     throw new ApiError(400, "Avatar is required");
   }
 
+  // fetch existing avatar url so we can delete it later
+  const existingUser = await User.findById(req.user?._id).select("avatar");
+  const oldAvatarUrl = existingUser?.avatar;
+
   const avatar = await uploadOnCloudinary(avatarLocalPath);
 
   if (!avatar.url) {
@@ -307,7 +314,14 @@ const updateUserAvatar = asyncHandler(async (req, res) => {
     { new: true }
   ).select("-password");
 
-  // TODO: delete the old image from cloudinary
+  // delete the old image from cloudinary (best-effort)
+  if (oldAvatarUrl && oldAvatarUrl !== avatar.url) {
+    try {
+      await deleteFromCloudinary(oldAvatarUrl);
+    } catch (error) {
+      console.error("Error deleting old avatar from Cloudinary:", error);
+    }
+  }
 
   return res
     .status(200)
@@ -320,6 +334,12 @@ const updateUserCoverImage = asyncHandler(async (req, res) => {
   if (!coverImageLocalPath) {
     throw new ApiError(400, "Cover image is required");
   }
+
+  // fetch existing cover image url so we can delete it later
+  const existingUserForCover = await User.findById(req.user?._id).select(
+    "coverImage"
+  );
+  const oldCoverImageUrl = existingUserForCover?.coverImage;
 
   const coverImage = await uploadOnCloudinary(coverImageLocalPath);
 
@@ -337,7 +357,14 @@ const updateUserCoverImage = asyncHandler(async (req, res) => {
     { new: true }
   ).select("-password");
 
-  // TODO: delete the old cover image from cloudinary
+  // delete the old cover image from cloudinary (best-effort)
+  if (oldCoverImageUrl && oldCoverImageUrl !== coverImage.url) {
+    try {
+      await deleteFromCloudinary(oldCoverImageUrl);
+    } catch (error) {
+      console.error("Error deleting old cover image from Cloudinary:", error);
+    }
+  }
 
   return res
     .status(200)
