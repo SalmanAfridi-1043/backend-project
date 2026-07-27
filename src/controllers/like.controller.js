@@ -6,21 +6,123 @@ import { asyncHandler } from "../utils/asyncHandler.js";
 
 const toggleVideoLike = asyncHandler(async (req, res) => {
   const { videoId } = req.params;
-  //TODO: toggle like on video
+  const userId = req.user?._id;
+
+  // if (!mongoose.Types.ObjectId.isValid(videoId)) {
+  // }
+
+  // chech if video is valid based on database
+  if (!isValidObjectId(videoId)) {
+    throw new ApiError(400, "Invalid video id");
+  }
+
+  // check if the video is liked or not
+  const checkIsLikedByUser = await Like.findOne({
+    video: videoId,
+    likedBy: userId,
+  });
+
+  // if video has like, then delete/unlike it
+  if (checkIsLikedByUser) {
+    await checkIsLikedByUser.deleteOne();
+
+    return res
+      .status(200)
+      .json(new ApiResponse(200, {}, "Video like removed successfulley"));
+  }
+
+  // below is the production approach
+  // const like = await Like.findOneAndDelete({
+  //   video: videoId,
+  //   likedBy: userId,
+  // });
+
+  const like = await Like.create({
+    video: videoId,
+    likedBy: userId,
+  });
+  return res
+    .status(201)
+    .json(new ApiResponse(201, like, "Video liked successfulley"));
 });
 
 const toggleCommentLike = asyncHandler(async (req, res) => {
   const { commentId } = req.params;
-  //TODO: toggle like on comment
+
+  const userId = req.user?._id;
+
+  if (!isValidObjectId(commentId)) {
+    throw new ApiError(400, "Invalid comment id");
+  }
+
+  const checkIsLikedByUser = await Like.findOne({
+    comment: commentId,
+    likedBy: userId,
+  });
+
+  if (checkIsLikedByUser) {
+    await checkIsLikedByUser.deleteOne();
+    return res
+      .status(201)
+      .json(new ApiResponse(201, {}, "Comment like removed successfulley"));
+  }
+
+  const like = await Like.create({
+    comment: commentId,
+    likedBy: userId,
+  });
+
+  return res
+    .status(201)
+    .json(new ApiResponse(201, like, "Comment liked successfulley"));
 });
 
 const toggleTweetLike = asyncHandler(async (req, res) => {
   const { tweetId } = req.params;
-  //TODO: toggle like on tweet
+
+  const userId = req.user?._id;
+
+  if (!isValidObjectId(tweetId)) {
+    throw new ApiError(400, "Invalid tweet id");
+  }
+
+  const checkIsLikedByUser = await Like.findOne({
+    tweet: tweetId,
+    likedBy: userId,
+  });
+
+  if (checkIsLikedByUser) {
+    await checkIsLikedByUser.deleteOne();
+    return res
+      .status(201)
+      .json(new ApiResponse(201, {}, "Tweet like removed successfulley"));
+  }
+
+  const like = Like.create({
+    tweet: tweetId,
+    likedBy: userId,
+  });
+
+  return res
+    .status(201)
+    .json(new ApiResponse(201, { like }, "Tweet liked successfulley"));
 });
 
 const getLikedVideos = asyncHandler(async (req, res) => {
-  //TODO: get all liked videos
+  const userId = req.user?._id;
+
+  const likedVideos = await Like.find({
+    likedBy: userId,
+    video: {
+      $exists: true,
+    },
+  }).populate("video");
+
+  return res
+    .status(200)
+    .json(
+      new ApiResponse(200, likedVideos, "Liked videos fetched successfully")
+    );
 });
 
 export { toggleCommentLike, toggleTweetLike, toggleVideoLike, getLikedVideos };
