@@ -43,19 +43,22 @@ const toStandardUri = async (srvUri) => {
   const hostname =
     slashIndex === -1 ? hostAndRest : hostAndRest.slice(0, slashIndex);
   const query =
-    slashIndex === -1 ? "" : hostAndRest.slice(slashIndex + 1).replace(/^\?/, "");
+    slashIndex === -1
+      ? ""
+      : hostAndRest.slice(slashIndex + 1).replace(/^\?/, "");
 
   const srvRecords = await resolveDns(() =>
     dns.resolveSrv(`_mongodb._tcp.${hostname}`)
   );
 
-  const txtRecords = await resolveDns(() =>
-    dns.resolveTxt(hostname)
-  ).catch(() => []);
+  const txtRecords = await resolveDns(() => dns.resolveTxt(hostname)).catch(
+    () => []
+  );
 
   const hosts = srvRecords.map(({ name, port }) => `${name}:${port}`).join(",");
   const params = new URLSearchParams(
-    txtRecords.flat().join("&") || "authSource=admin&retryWrites=true&w=majority"
+    txtRecords.flat().join("&") ||
+      "authSource=admin&retryWrites=true&w=majority"
   );
 
   params.set("ssl", "true");
@@ -89,7 +92,7 @@ const connectDB = async () => {
     console.log(`MongoDB connected! DB: ${DB_NAME}`);
   } catch (error) {
     console.error("MongoDB connection failed:", error.message);
-    process.exit(1);
+    console.warn("Continuing without a database connection for now.");
   }
 };
 

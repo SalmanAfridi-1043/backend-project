@@ -1,9 +1,9 @@
 import mongoose, { isValidObjectId } from "mongoose";
 import { Playlist } from "../models/playlist.model.js";
+import { Video } from "../models/video.model.js";
 import { ApiError } from "../utils/ApiError.js";
 import { ApiResponse } from "../utils/ApiResponse.js";
 import { asyncHandler } from "../utils/asyncHandler.js";
-import { isValidElement } from "react";
 
 const createPlaylist = asyncHandler(async (req, res) => {
   const { name, discription } = req.body;
@@ -14,12 +14,6 @@ const createPlaylist = asyncHandler(async (req, res) => {
     throw new ApiError(400, "Playlist name is required");
   }
 
-  const playlist = await Playlist.create({
-    owner: userId,
-    name: name.trim(),
-    discription: discription?.trim() || "",
-  });
-
   const existingPlaylist = await Playlist.findOne({
     owner: userId,
     name: name.trim(),
@@ -29,8 +23,13 @@ const createPlaylist = asyncHandler(async (req, res) => {
     throw new ApiError(409, "Playlist with this name already exists");
   }
 
-  return res
+  const playlist = await Playlist.create({
+    owner: userId,
+    name: name.trim(),
+    discription: discription?.trim() || "",
+  });
 
+  return res
     .status(200)
     .json(new ApiResponse(200, playlist, "Playlist created successfully"));
 });
@@ -64,15 +63,13 @@ const getPlaylistById = asyncHandler(async (req, res) => {
     throw new ApiError(400, "Invalid playlist id");
   }
 
-  const playlist = await Playlist.findById(playlistId);
-
-  // if (!playlist) {
-  //   throw new ApiError(404, "Playlist not found");
-  // }
-
   const playlist = await Playlist.findById(playlistId)
     .populate("owner", "username fullname avatar")
     .populate("videos");
+
+  if (!playlist) {
+    throw new ApiError(404, "Playlist not found");
+  }
 
   return res
     .status(200)
@@ -98,10 +95,10 @@ const addVideoToPlaylist = asyncHandler(async (req, res) => {
   const playlist = await Playlist.findById(playlistId);
 
   if (!playlist) {
-    throw new ApiError(404, "Playlist list not found");
+    throw new ApiError(404, "Playlist not found");
   }
 
-  const video = await Playlist.findById(videoId);
+  const video = await Video.findById(videoId);
 
   if (!video) {
     throw new ApiError(404, "Video not found");
@@ -112,8 +109,12 @@ const addVideoToPlaylist = asyncHandler(async (req, res) => {
     throw new ApiError(403, "Unauthorized request");
   }
 
-  if (Playlist.videos.includes(videoId)) {
-    throw new ApiError(409, "Video already exist in playlist");
+  const isVideoInPlaylist = playlist.videos.some(
+    (id) => id.toString() === videoId.toString()
+  );
+
+  if (isVideoInPlaylist) {
+    throw new ApiError(409, "Video already exists in playlist");
   }
 
   playlist.videos.push(videoId);
@@ -144,14 +145,20 @@ const removeVideoFromPlaylist = asyncHandler(async (req, res) => {
   }
 
   if (playlist.owner.toString() !== userId.toString()) {
-    throw new ApiError(400, "Unauthorized request");
+    throw new ApiError(403, "Unauthorized request");
   }
 
-  if (!playlist.videos.includes(videoId)) {
+  const isVideoInPlaylist = playlist.videos.some(
+    (id) => id.toString() === videoId.toString()
+  );
+
+  if (!isVideoInPlaylist) {
     throw new ApiError(404, "Video not found in playlist");
   }
 
-  playlist.videos = playlist.videos.filter((id) => id.toString() !== videoId);
+  playlist.videos = playlist.videos.filter(
+    (id) => id.toString() !== videoId.toString()
+  );
 
   await playlist.save({ validateBeforeSave: false });
 
@@ -219,10 +226,10 @@ const updatePlaylist = asyncHandler(async (req, res) => {
   const userId = req.user?._id;
 
   if (!isValidObjectId(playlistId)) {
-    throw new ApiResponse(400, "Invalid playlist id");
+    throw new ApiError(400, "Invalid playlist id");
   }
 
-  if (!name.trim()) {
+  if (!name?.trim()) {
     throw new ApiError(400, "Playlist name is required");
   }
 
@@ -237,7 +244,7 @@ const updatePlaylist = asyncHandler(async (req, res) => {
   }
 
   playlist.name = name.trim();
-  playlist.discription = discription.trim();
+  playlist.discription = discription?.trim() || "";
 
   await playlist.save({ validateBeforeSave: false });
 

@@ -16,10 +16,10 @@ const likeSchema = new Schema(
     },
     likedBy: {
       type: Schema.Types.ObjectId,
-      ref: "User ",
+      ref: "User",
     },
   },
   { timestamps: true }
 );
 
-export const Like = model("Like", likeSchema);
+export const Like = mongoose.models.Like || model("Like", likeSchema);

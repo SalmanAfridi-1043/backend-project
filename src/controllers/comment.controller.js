@@ -35,17 +35,17 @@ const getVideoComments = asyncHandler(async (req, res) => {
 
 const addComment = asyncHandler(async (req, res) => {
   // getting video id to be commented
-  const videoId = req.params;
+  const { videoId } = req.params;
 
   // getting comment content
   const { content } = req.body;
 
   // getting current user to comment
-  const user = req.user?._id;
+  const owner = req.user?._id;
 
   // validate the video based on id
   if (!mongoose.Types.ObjectId.isValid(videoId)) {
-    throw new ApiError(401, "Invalid video id");
+    throw new ApiError(400, "Invalid video id");
   }
 
   // check if the content is empty
@@ -104,7 +104,7 @@ const updateComment = asyncHandler(async (req, res) => {
 
   return res
     .status(200)
-    .json(new ApiResponse(400, comment, "Comment updated successfully"));
+    .json(new ApiResponse(200, comment, "Comment updated successfully"));
 });
 
 const deleteComment = asyncHandler(async (req, res) => {

@@ -11,17 +11,17 @@ const toggleSubscription = asyncHandler(async (req, res) => {
   const subscriberId = req.user?._id;
 
   if (!isValidObjectId(channelId)) {
-    throw new ApiError(400, "Invalide channel id");
+    throw new ApiError(400, "Invalid channel id");
   }
 
-  const channel = await Subscription.findById(channelId);
+  const channel = await User.findById(channelId);
 
   if (!channel) {
     throw new ApiError(404, "Channel with this id not found");
   }
 
-  if (channelId == subscriberId.toString()) {
-    throw new ApiError(400, "You can't subscribe your channel");
+  if (channelId.toString() === subscriberId?.toString()) {
+    throw new ApiError(400, "You can't subscribe to your own channel");
   }
 
   const isChannelSubscribe = await Subscription.findOne({
@@ -66,7 +66,7 @@ const getUserChannelSubscribers = asyncHandler(async (req, res) => {
     throw new ApiError(400, "Invalid channel id");
   }
 
-  const channel = await Subscription.findById(channelId);
+  const channel = await User.findById(channelId);
 
   if (!channel) {
     throw new ApiError(404, "Channel not found");
@@ -94,7 +94,7 @@ const getSubscribedChannels = asyncHandler(async (req, res) => {
     throw new ApiError(400, "Invalid subscriber id");
   }
 
-  const user = await Subscription.findById(subscriberId);
+  const user = await User.findById(subscriberId);
 
   if (!user) {
     throw new ApiError(400, "Invalid user id");

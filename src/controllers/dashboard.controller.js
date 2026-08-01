@@ -5,7 +5,7 @@ import { Like } from "../models/like.model.js";
 import { ApiError } from "../utils/ApiError.js";
 import { ApiResponse } from "../utils/ApiResponse.js";
 import { asyncHandler } from "../utils/asyncHandler.js";
-import { createDecipheriv } from "crypto";
+
 
 const getChannelStats = asyncHandler(async (req, res) => {
   // current user
@@ -26,7 +26,7 @@ const getChannelStats = asyncHandler(async (req, res) => {
   });
 
   // total viewers
-  const viewResult = Video.aggregate([
+  const viewResult = await Video.aggregate([
     {
       $match: {
         owner: new mongoose.Types.ObjectId(channelId),

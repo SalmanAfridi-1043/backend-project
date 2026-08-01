@@ -5,13 +5,31 @@ import {
   uploadOnCloudinary,
   deleteFromCloudinary,
 } from "../utils/Cloudinary.js";
+import {
+  isMongoConnected,
+  createFallbackUser,
+  findFallbackUserByIdentifier,
+  findFallbackUserById,
+  updateFallbackUserById,
+} from "../utils/userStore.js";
 import { ApiResponse } from "../utils/ApiResponse.js";
 import jwt from "jsonwebtoken";
 import mongoose from "mongoose";
 
+const getUserModel = async () => {
+  if (isMongoConnected()) {
+    return User;
+  }
+
+  return null;
+};
+
 const generateAccessAndRefreshToken = async (userId) => {
   try {
-    const user = await User.findById(userId);
+    const UserModel = await getUserModel();
+    const user = UserModel
+      ? await UserModel.findById(userId)
+      : await findFallbackUserById(userId);
 
     if (!user) {
       throw new ApiError(404, "User not found during token generation");
@@ -37,61 +55,72 @@ const generateAccessAndRefreshToken = async (userId) => {
 const registerUser = asyncHandler(async (req, res) => {
   const { fullname, username, email, password } = req.body;
 
-  // console.log("fullname ", name);
-  // console.log("Request body : ", req.body);
-
   if (
     [fullname, username, email, password].some((field) => field?.trim() === "")
   ) {
     throw new ApiError(400, "All fields are required");
   }
 
-  const userExist = await User.findOne({
-    $or: [{ username: username.toLowerCase() }, { email: email.toLowerCase() }],
-  });
+  const normalizedUsername = username.trim().toLowerCase();
+  const normalizedEmail = email.trim().toLowerCase();
+
+  const UserModel = await getUserModel();
+
+  const userExist = UserModel
+    ? await UserModel.findOne({
+        $or: [{ username: normalizedUsername }, { email: normalizedEmail }],
+      })
+    : await findFallbackUserByIdentifier(normalizedUsername);
 
   if (userExist) {
     throw new ApiError(409, "User with email or username already exists");
   }
 
-  // below is return from multer when it saves the images on cloudinary
-  // req.body is from express while req.files is from multer
-  const avatarPath = req.files?.avatar[0]?.path;
-  // const coverImagePath = req.files?.coverImage[0]?.path;
+  const avatarLocalPath = req.files?.avatar?.[0]?.path;
+  const coverImageLocalPath = req.files?.coverImage?.[0]?.path;
 
-  let coverImagePath;
-  if (
-    req.files &&
-    Array.isArray(req.files.coverImage) &&
-    req.files.coverImage.length > 0
-  ) {
-    coverImagePath = req.files.coverImage[0].path;
+  let avatarUrl = "";
+  let coverImageUrl = "";
+
+  if (avatarLocalPath) {
+    const avatar = await uploadOnCloudinary(avatarLocalPath);
+    avatarUrl = avatar?.url || "";
   }
 
-  // console.log("Request file : ", req.files);
-
-  if (!avatarPath) {
-    throw new ApiError(400, "Avatar is required");
+  if (coverImageLocalPath) {
+    const coverImage = await uploadOnCloudinary(coverImageLocalPath);
+    coverImageUrl = coverImage?.url || "";
   }
 
-  const avatar = await uploadOnCloudinary(avatarPath);
-  const coverImage = await uploadOnCloudinary(coverImagePath);
+  if (!avatarUrl) {
+    avatarUrl = "https://via.placeholder.com/150";
+  }
 
-  if (!avatar) throw new ApiError(400, "Avatar is required");
+  const user = UserModel
+    ? await UserModel.create({
+        fullname: fullname.trim(),
+        email: normalizedEmail,
+        username: normalizedUsername,
+        avatar: avatarUrl,
+        coverImage: coverImageUrl,
+        password,
+      })
+    : await createFallbackUser({
+        fullname: fullname.trim(),
+        email: normalizedEmail,
+        username: normalizedUsername,
+        avatar: avatarUrl,
+        coverImage: coverImageUrl,
+        password,
+      });
 
-  const user = await User.create({
-    fullname,
-    email,
-    username: username.toLowerCase(),
-    avatar: avatar.url,
-    coverImage: coverImage?.url || "",
-    password,
-  });
-
-  // removing password and refreshToken from data using select()
-  const createdUser = await User.findById(user._id).select(
-    "-password -refreshToken"
-  );
+  const createdUser = UserModel
+    ? await UserModel.findById(user._id).select("-password -refreshToken")
+    : {
+        ...user,
+        password: undefined,
+        refreshToken: undefined,
+      };
 
   if (!createdUser) {
     throw new ApiError(500, "Something went wrong while registering the user");
@@ -99,28 +128,28 @@ const registerUser = asyncHandler(async (req, res) => {
 
   return res
     .status(201)
-    .json(new ApiResponse(200, createdUser, "User registered successfully"));
+    .json(new ApiResponse(201, createdUser, "User registered successfully"));
 });
 
 const loginUser = asyncHandler(async (req, res) => {
-  // req.body - data
-  //check all field are required.
-  // check username or email . if not exit return 401
-  //check password.
-  // generate access + refresh token to user
-  // send cookies
-
   const { username, email, password } = req.body;
-  const normalizedUsername = username?.toLowerCase();
-  const normalizedEmail = email?.toLowerCase();
+  const loginIdentifier = username?.trim() || email?.trim();
+  const normalizedIdentifier = loginIdentifier?.toLowerCase();
 
-  if (!(normalizedUsername || normalizedEmail)) {
-    throw new ApiError(400, "username or email is required");
+  if (!normalizedIdentifier) {
+    throw new ApiError(400, "Username or email is required");
   }
 
-  const user = await User.findOne({
-    $or: [{ username: normalizedUsername }, { email: normalizedEmail }],
-  });
+  const UserModel = await getUserModel();
+
+  const user = UserModel
+    ? await UserModel.findOne({
+        $or: [
+          { username: normalizedIdentifier },
+          { email: normalizedIdentifier },
+        ],
+      })
+    : await findFallbackUserByIdentifier(normalizedIdentifier);
 
   if (!user) {
     throw new ApiError(404, "User not found");
@@ -129,21 +158,25 @@ const loginUser = asyncHandler(async (req, res) => {
   const isPasswordValid = await user.isPasswordCorrect(password);
 
   if (!isPasswordValid) {
-    throw new ApiError(401, "Invalid user cradentails");
+    throw new ApiError(401, "Invalid user credentials");
   }
 
   const { accessToken, refreshToken } = await generateAccessAndRefreshToken(
     user._id
   );
 
-  const loggedInUser = await User.findById(user._id).select(
-    "-password -refreshToken"
-  );
+  const loggedInUser = UserModel
+    ? await UserModel.findById(user._id).select("-password -refreshToken")
+    : {
+        ...user,
+        password: undefined,
+        refreshToken: undefined,
+      };
 
-  // to make the refresh token ReadMe only for frontend
   const options = {
     httpOnly: true,
-    secure: true,
+    secure: process.env.NODE_ENV === "production",
+    sameSite: "lax",
   };
 
   return res
@@ -164,19 +197,26 @@ const loginUser = asyncHandler(async (req, res) => {
 });
 
 const loggOutUser = asyncHandler(async (req, res) => {
-  await User.findByIdAndUpdate(
-    req.user._id,
-    {
-      $unset: { refreshToken: 1 },
-    },
-    {
-      new: true,
-    }
-  );
+  const UserModel = await getUserModel();
+
+  if (UserModel) {
+    await UserModel.findByIdAndUpdate(
+      req.user._id,
+      {
+        $unset: { refreshToken: 1 },
+      },
+      {
+        new: true,
+      }
+    );
+  } else {
+    await updateFallbackUserById(req.user._id, { refreshToken: undefined });
+  }
 
   const options = {
     httpOnly: true,
-    secure: true,
+    secure: process.env.NODE_ENV === "production",
+    sameSite: "lax",
   };
 
   return res
@@ -199,7 +239,10 @@ const refreshAccessToken = asyncHandler(async (req, res, next) => {
       process.env.REFRESH_TOKEN_SECRET
     );
 
-    const user = await User.findById(decodedToken?._id);
+    const UserModel = await getUserModel();
+    const user = UserModel
+      ? await UserModel.findById(decodedToken?._id)
+      : await findFallbackUserById(decodedToken?._id);
 
     if (!user) {
       throw new ApiError(401, "Invalid Refresh Token");
@@ -211,10 +254,11 @@ const refreshAccessToken = asyncHandler(async (req, res, next) => {
 
     const options = {
       httpOnly: true,
-      secure: true,
+      secure: process.env.NODE_ENV === "production",
+      sameSite: "lax",
     };
 
-    const { accessToken, newRefreshToken } =
+    const { accessToken, refreshToken: newRefreshToken } =
       await generateAccessAndRefreshToken(user._id);
 
     return res
